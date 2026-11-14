@@ -24,10 +24,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle 8.8
+      - name: Setup Gradle 8.1.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.8'
+          gradle-version: '8.1.1'
 
       - name: Raise Gradle heap
         run: |
@@ -41,19 +41,8 @@ jobs:
           ls -A
           echo "=== build.gradle 关键行 ==="
           grep -nE "selfTest|net\.minecraftforge\.gradle|languageVersion|mainClass" build.gradle
-          echo "=== gradle 任务里有没有 selftest ==="
-          gradle tasks --all --no-daemon -q 2>&1 | grep -iE "selftest" || echo "（任务列表中未找到 selftest）"
-
-      - name: Diagnose build script
-        run: |
-          set +e
-          gradle help --no-daemon --stacktrace 2>&1 | tee help.log
-          code=${PIPESTATUS[0]}
-          if [ $code -ne 0 ]; then
-            msg=$(tail -n 25 help.log | tr '\n' ' ' | cut -c1-1500)
-            echo "::error title=build.gradle 解析失败::${msg}"
-            exit $code
-          fi
+          echo "=== gradle 版本 ==="
+          gradle --version 2>&1 | grep -E "Gradle|JVM"
 
       - name: Core self test
         continue-on-error: true
@@ -62,7 +51,8 @@ jobs:
           gradle selfTest --no-daemon --stacktrace 2>&1 | tee selftest.log
           code=${PIPESTATUS[0]}
           if [ $code -ne 0 ]; then
-            msg=$(tail -n 25 selftest.log | tr '\n' ' ' | cut -c1-1500)
+            msg=$(sed -n '/What went wrong/,/^\* Try/p' selftest.log | head -25 | tr '\n' ' ' | cut -c1-1400)
+            if [ -z "$msg" ]; then msg=$(head -40 selftest.log | tr '\n' ' ' | cut -c1-1400); fi
             echo "::error title=selfTest 失败::${msg}"
           fi
           exit 0
@@ -73,7 +63,8 @@ jobs:
           gradle build --no-daemon --stacktrace 2>&1 | tee build.log
           code=${PIPESTATUS[0]}
           if [ $code -ne 0 ]; then
-            msg=$(tail -n 30 build.log | tr '\n' ' ' | cut -c1-1500)
+            msg=$(sed -n '/What went wrong/,/^\* Try/p' build.log | head -25 | tr '\n' ' ' | cut -c1-1400)
+            if [ -z "$msg" ]; then msg=$(head -40 build.log | tr '\n' ' ' | cut -c1-1400); fi
             echo "::error title=编译失败::${msg}"
             exit $code
           fi
