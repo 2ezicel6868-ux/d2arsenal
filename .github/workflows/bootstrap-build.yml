@@ -18,6 +18,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Extract project from uploaded zip
+        run: |
+          set -e
+          echo "=== 仓库根目录 ==="
+          ls -A
+          ZIP=$(ls -1 *.zip | head -n 1)
+          echo "=== 使用压缩包: $ZIP ==="
+          unzip -o -q "$ZIP" -d .
+          if [ ! -f build.gradle ] && [ -f destiny2-arsenal/build.gradle ]; then
+            shopt -s dotglob
+            mv destiny2-arsenal/* .
+            rmdir destiny2-arsenal || true
+          fi
+          test -f settings.gradle || { echo "::error::解压后没有 settings.gradle"; exit 1; }
+          test -f build.gradle || { echo "::error::解压后没有 build.gradle"; exit 1; }
+          echo "=== 解压后根目录 ==="
+          ls -A
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
@@ -37,11 +55,7 @@ jobs:
       - name: Inspect project
         run: |
           set +e
-          echo "=== 根目录 ==="
-          ls -A
-          echo "=== build.gradle 关键行 ==="
           grep -nE "selfTest|net\.minecraftforge\.gradle|languageVersion|mainClass" build.gradle
-          echo "=== gradle 版本 ==="
           gradle --version 2>&1 | grep -E "Gradle|JVM"
 
       - name: Core self test
